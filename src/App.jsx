@@ -1,8 +1,8 @@
 import React from 'react';
-import { Toaster } from "@/components/ui/toaster"
+import { Toaster } from 'react-hot-toast';
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -22,12 +22,12 @@ import SetNewPassword from './pages/auth/SetNewPassword';
 
 const AuthenticatedApp = () => {
   const [splashDone, setSplashDone] = React.useState(false);
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const { isAuthenticated, isLoadingAuth } = useAuth();
 
   if (!splashDone) return <SplashScreen onDone={() => setSplashDone(true)} />;
 
-  // Show loading spinner while checking app public settings or auth
-  if (isLoadingPublicSettings || isLoadingAuth) {
+  // Show loading spinner while checking auth
+  if (isLoadingAuth) {
     return (
       <div className="fixed inset-0 flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
@@ -35,15 +35,9 @@ const AuthenticatedApp = () => {
     );
   }
 
-  // Handle authentication errors
-  if (authError) {
-    if (authError.type === 'user_not_registered') {
-      return <UserNotRegisteredError />;
-    } else if (authError.type === 'auth_required') {
-      // Redirect to login automatically
-      navigateToLogin();
-      return null;
-    }
+  // Redirect to login automatically if not authenticated
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
   }
 
   // Render the main app
@@ -79,7 +73,7 @@ function App() {
             <Route path="*" element={<AuthenticatedApp />} />
           </Routes>
         </Router>
-        <Toaster />
+        <Toaster position="top-center" />
       </QueryClientProvider>
     </AuthProvider>
   )

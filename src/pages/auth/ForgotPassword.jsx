@@ -1,16 +1,35 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Mail, KeyRound, ArrowLeft } from "lucide-react";
+import { Mail, KeyRound, ArrowLeft, Loader2 } from "lucide-react";
+import api from "@/lib/api";
+import { useMutation } from "@tanstack/react-query";
+import toast from "react-hot-toast";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
   const navigate = useNavigate();
 
+  const forgotPasswordMutation = useMutation({
+    mutationFn: (data) => api.post("/auth/forgot-password/", data),
+    onSuccess: () => {
+      // Save email to local storage so it persists even if they refresh the OTP page
+      localStorage.setItem("reset_email", email);
+      toast.success("Please check your email for the verification code.");
+      navigate("/otp-verify");
+    },
+    onError: (err) => {
+      console.error("Forgot password failed:", err);
+      toast.error(err.response?.data?.message || "Failed to send OTP. Please try again.");
+    }
+  });
+
   const handleSendOTP = (e) => {
     e.preventDefault();
-    // Simulate API call to send OTP, then navigate to OTP verification
-    navigate("/otp-verify");
+    if (!email) return;
+    forgotPasswordMutation.mutate({ email });
   };
+
+  const isLoading = forgotPasswordMutation.isPending;
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-background relative overflow-hidden">
@@ -42,8 +61,12 @@ export default function ForgotPassword() {
             </div>
           </div>
 
-          <button type="submit" className="w-full py-2.5 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 transition-all mt-6 shadow-[0_0_15px_rgba(var(--primary),0.3)]">
-            Send OTP
+          <button 
+            type="submit" 
+            disabled={isLoading}
+            className="w-full py-2.5 flex justify-center items-center gap-2 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 transition-all mt-6 shadow-[0_0_15px_rgba(var(--primary),0.3)] disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Send OTP"}
           </button>
         </form>
 

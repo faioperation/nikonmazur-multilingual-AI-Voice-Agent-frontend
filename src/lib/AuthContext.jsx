@@ -1,130 +1,86 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
-import { appParams } from '@/lib/app-params';
-import { createAxiosClient } from '@base44/sdk/dist/utils/axios-client';
+import Cookies from 'js-cookie';
+import api from '@/lib/api';
+import toast from 'react-hot-toast';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(!!Cookies.get('token'));
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
-  const [isLoadingPublicSettings, setIsLoadingPublicSettings] = useState(true);
-  const [authError, setAuthError] = useState(null);
-  const [authChecked, setAuthChecked] = useState(false);
-  const [appPublicSettings, setAppPublicSettings] = useState(null); // Contains only { id, public_settings }
 
   useEffect(() => {
-    checkAppState();
+    checkUserAuth();
   }, []);
 
-  const checkAppState = async () => {
-    try {
-      setIsLoadingPublicSettings(true);
-      setAuthError(null);
-      
-      // First, check app public settings (with token if available)
-      // This will tell us if auth is required, user not registered, etc.
-      const appClient = createAxiosClient({
-        baseURL: `/api/apps/public`,
-        headers: {
-          'X-App-Id': appParams.appId
-        },
-        token: appParams.token, // Include token if available
-        interceptResponses: true
-      });
-      
-      try {
-        const publicSettings = await appClient.get(`/prod/public-settings/by-id/${appParams.appId}`);
-        setAppPublicSettings(publicSettings);
-        
-        // If we got the app public settings successfully, check if user is authenticated
-        if (appParams.token) {
-          await checkUserAuth();
-        } else {
-          setIsLoadingAuth(false);
-          setIsAuthenticated(false);
-          setAuthChecked(true);
-        }
-        setIsLoadingPublicSettings(false);
-      } catch (appError) {
-        console.error('App state check failed:', appError);
-        
-        // Handle app-level errors
-        if (appError.status === 403 && appError.data?.extra_data?.reason) {
-          const reason = appError.data.extra_data.reason;
-          if (reason === 'auth_required') {
-            setAuthError({
-              type: 'auth_required',
-              message: 'Authentication required'
-            });
-          } else if (reason === 'user_not_registered') {
-            setAuthError({
-              type: 'user_not_registered',
-              message: 'User not registered for this app'
-            });
-          } else {
-            setAuthError({
-              type: reason,
-              message: appError.message
-            });
-          }
-        } else {
-          setAuthError({
-            type: 'unknown',
-            message: appError.message || 'Failed to load app'
-          });
-        }
-        setIsLoadingPublicSettings(false);
-        setIsLoadingAuth(false);
-      }
-    } catch (error) {
-      console.error('Unexpected error:', error);
-      setAuthError({
-        type: 'unknown',
-        message: error.message || 'An unexpected error occurred'
-      });
-      setIsLoadingPublicSettings(false);
-      setIsLoadingAuth(false);
-    }
-  };
-
   const checkUserAuth = async () => {
-    try {
-      // Now check if the user is authenticated
-      setIsLoadingAuth(true);
-      const currentUser = await base44.auth.me();
-      setUser(currentUser);
-      setIsAuthenticated(true);
+    const token = Cookies.get('token');
+    if (!token) {
+      setIsAuthenticated(false);
+      setUser(null);
       setIsLoadingAuth(false);
-      setAuthChecked(true);
+      return;
+    }
+
+    try {
+      // Check if we saved the user data in local storage during login
+      const savedUser = localStorage.getItem('user');
+      if (savedUser) {
+        setUser(JSON.parse(savedUser));
+      } else {
+        // Fallback for demo purposes
+        setUser({ name: "Demo User", email: "demo@example.com" });
+      }
+      setIsAuthenticated(true);
     } catch (error) {
       console.error('User auth check failed:', error);
-      setIsLoadingAuth(false);
+      Cookies.remove('token');
       setIsAuthenticated(false);
-      setAuthChecked(true);
+      setUser(null);
+    } finally {
+      setIsLoadingAuth(false);
+    }
+  };
+
+  const login = (tokens, userData, mustChangePassword = false) => {
+    if (tokens.access) Cookies.set('token', tokens.access, { expires: 7 }); // Access cookie expires in 7 days
+    if (tokens.refresh) Cookies.set('refresh_token', tokens.refresh, { expires: 30 }); // Refresh cookie expires in 30 days
+    
+    if (userData) {
+      setUser(userData);
+      localStorage.setItem('user', JSON.stringify(userData)); // Optional: Store user locally so it persists across reloads immediately
       
-      // If user auth fails, it might be an expired token
-      if (error.status === 401 || error.status === 403) {
-        setAuthError({
-          type: 'auth_required',
-          message: 'Authentication required'
-        });
+      // Save role in cookies as requested
+      if (userData.role) {
+        Cookies.set('role', userData.role, { expires: 7 });
       }
     }
-  };
-
-  const logout = (shouldRedirect = true) => {
-    setUser(null);
-    setIsAuthenticated(false);
-    base44.auth.logout();
     
-    if (shouldRedirect) {
-      window.location.href = '/login';
+    setIsAuthenticated(true);
+    
+    // Redirect based on whether they need to change their password
+    if (mustChangePassword) {
+      toast.error("Please change your password", { icon: '⚠️', duration: 3000 });
+      setTimeout(() => {
+        window.location.href = '/settings';
+      }, 1500);
+    } else {
+      window.location.href = '/';
     }
   };
 
-  const navigateToLogin = () => {
+  const logout = () => {
+    // Clear every single cookie dynamically
+    Object.keys(Cookies.get()).forEach(cookieName => {
+      Cookies.remove(cookieName);
+    });
+    
+    // Clear all local storage as well
+    localStorage.clear();
+    
+    setUser(null);
+    setIsAuthenticated(false);
     window.location.href = '/login';
   };
 
@@ -133,14 +89,9 @@ export const AuthProvider = ({ children }) => {
       user, 
       isAuthenticated, 
       isLoadingAuth,
-      isLoadingPublicSettings,
-      authError,
-      appPublicSettings,
-      authChecked,
+      login,
       logout,
-      navigateToLogin,
-      checkUserAuth,
-      checkAppState
+      checkUserAuth
     }}>
       {children}
     </AuthContext.Provider>
