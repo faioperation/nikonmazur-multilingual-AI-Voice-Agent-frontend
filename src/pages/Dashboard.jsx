@@ -1,9 +1,17 @@
-import { Phone, Clock, Calendar, Target, CheckCircle } from "lucide-react";
+import { Phone, Clock, Target, CheckCircle, Car, Loader2 } from "lucide-react";
 import MetricCard from "../components/MetricCard";
-import { recordings, dailyCallData, outcomeData } from "../lib/demoData";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import StatusBadge from "../components/StatusBadge";
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import api from "../lib/api";
+
+const formatDuration = (seconds) => {
+  if (!seconds) return "0s";
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+};
 
 const CustomTooltip = ({ active = false, payload = [], label = "" }) => {
   if (!active || !payload?.length) return null;
@@ -16,8 +24,45 @@ const CustomTooltip = ({ active = false, payload = [], label = "" }) => {
 };
 
 export default function Dashboard() {
+  const { data: stats, isLoading, isError, error } = useQuery({
+    queryKey: ['dashboardStats'],
+    queryFn: async () => {
+      const res = await api.get('/api/v1/stats/overview/');
+      return res.data?.data || res.data;
+    }
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    console.error("Dashboard fetch error:", error);
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] text-destructive gap-2">
+        <p>Failed to load dashboard data.</p>
+        <p className="text-sm opacity-80">{error?.response?.data?.message || error?.message || "Unknown error"}</p>
+      </div>
+    );
+  }
+
+  const cards = stats?.cards || {};
+  const activity = stats?.call_activity || [];
+  
+  const COLORS = ['#4ade80', '#60a5fa', '#f472b6', '#a78bfa', '#fbbf24', '#f87171'];
+  const outcomes = (stats?.call_outcomes || []).map((o, i) => ({
+    ...o,
+    fill: COLORS[i % COLORS.length]
+  }));
+
+  const recentCalls = stats?.recent_calls || [];
+
   return (
-    <div className="space-y-6 max-w-7xl">
+    <div className="space-y-6 w-full">
       <div>
         <h2 className="font-heading text-3xl font-semibold tracking-wide">Dashboard Overview</h2>
         <p className="text-sm text-muted-foreground mt-1">Monitor every AI conversation in one place.</p>
@@ -25,14 +70,14 @@ export default function Dashboard() {
 
       {/* Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        <MetricCard title="Calls Today" value="73" change={12.5} icon={Phone} />
-        <MetricCard title="Calls This Week" value="311" change={8.2} icon={Phone} />
-        <MetricCard title="Minutes Today" value="271" change={15.1} icon={Clock} />
-        <MetricCard title="Minutes This Week" value="1,147" change={6.8} icon={Clock} />
-        <MetricCard title="Avg Duration" value="3m 42s" change={-2.1} icon={Clock} />
-        <MetricCard title="Booked Appointments" value="34" change={22.4} icon={Calendar} />
-        <MetricCard title="Conversion Rate" value="28.4%" change={4.7} icon={Target} />
-        <MetricCard title="Success Rate" value="78%" change={3.2} icon={CheckCircle} />
+        <MetricCard title="Calls Today" value={cards.calls_today || 0} icon={Phone} />
+        <MetricCard title="Calls This Week" value={cards.calls_this_week || 0} icon={Phone} />
+        <MetricCard title="Minutes Today" value={cards.minutes_today || 0} icon={Clock} />
+        <MetricCard title="Minutes This Week" value={cards.minutes_this_week || 0} icon={Clock} />
+        <MetricCard title="Avg Duration" value={cards.average_duration || "0s"} icon={Clock} />
+        <MetricCard title="Test Drives" value={cards.test_drive_count || 0} icon={Car} />
+        <MetricCard title="Conversion Rate" value="0%" icon={Target} />
+        <MetricCard title="Success Rate" value="0%" icon={CheckCircle} />
       </div>
 
       {/* Charts */}
@@ -40,7 +85,7 @@ export default function Dashboard() {
         <div className="lg:col-span-2 glow-border rounded-xl bg-card p-5">
           <h3 className="text-sm font-semibold mb-4">Call Activity — This Week</h3>
           <ResponsiveContainer width="100%" height={240}>
-            <AreaChart data={dailyCallData}>
+            <AreaChart data={activity}>
               <defs>
                 <linearGradient id="callGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="hsl(0,0%,70%)" stopOpacity={0.2} />
@@ -50,7 +95,7 @@ export default function Dashboard() {
                   <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: "hsl(0,0%,40%)", fontSize: 11 }} />
                   <YAxis axisLine={false} tickLine={false} tick={{ fill: "hsl(0,0%,40%)", fontSize: 11 }} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Area type="monotone" dataKey="calls" stroke="hsl(0,0%,75%)" fill="url(#callGrad)" strokeWidth={1.5} name="Calls" />
+                  <Area type="monotone" dataKey="count" stroke="hsl(0,0%,75%)" fill="url(#callGrad)" strokeWidth={1.5} name="Calls" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -58,18 +103,18 @@ export default function Dashboard() {
           <h3 className="text-sm font-semibold mb-4">Call Outcomes</h3>
           <ResponsiveContainer width="100%" height={240}>
             <PieChart>
-              <Pie data={outcomeData} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={3} dataKey="value">
-                {outcomeData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+              <Pie data={outcomes} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={3} dataKey="count" nameKey="name">
+                {outcomes.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
               </Pie>
               <Tooltip content={<CustomTooltip />} />
             </PieChart>
           </ResponsiveContainer>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2">
-            {outcomeData.map(o => (
+            {outcomes.map(o => (
               <div key={o.name} className="flex items-center gap-1.5 text-[11px]">
                 <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: o.fill }} />
                 <span className="text-muted-foreground truncate">{o.name}</span>
-                <span className="font-medium ml-auto">{o.value}</span>
+                <span className="font-medium ml-auto">{o.count}</span>
               </div>
             ))}
           </div>
@@ -94,16 +139,24 @@ export default function Dashboard() {
               </tr>
             </thead>
             <tbody>
-              {recordings.slice(0, 5).map(r => (
-                <tr key={r.id} className="border-t border-border hover:bg-secondary/30 transition-colors">
+              {recentCalls.map((r, index) => (
+                <tr key={index} className="border-t border-border hover:bg-secondary/30 transition-colors">
                   <td className="px-5 py-3">
-                    <p className="font-medium">{r.contact}</p>
-                    <p className="text-xs text-muted-foreground">{r.company}</p>
+                    <p className="font-medium">{r.caller_name || "Unknown Caller"}</p>
+                    <p className="text-xs text-muted-foreground">{r.caller_number || "No Number"}</p>
                   </td>
-                  <td className="px-5 py-3 text-muted-foreground hidden md:table-cell">{r.agent}</td>
-                  <td className="px-5 py-3 text-muted-foreground">{r.duration}</td>
-                  <td className="px-5 py-3"><StatusBadge status={r.sentiment === "Positive" ? "Active" : r.sentiment === "Neutral" ? "Pending" : "Error"} /><span className="ml-2 text-xs">{r.outcome}</span></td>
-                  <td className="px-5 py-3 hidden lg:table-cell"><StatusBadge status={r.sentiment} /></td>
+                  <td className="px-5 py-3 text-muted-foreground hidden md:table-cell">{r.assistant_name}</td>
+                  <td className="px-5 py-3 text-muted-foreground">{formatDuration(r.duration_seconds)}</td>
+                  <td className="px-5 py-3">
+                    {r.outcome ? (
+                      <span className="text-xs uppercase tracking-wider font-medium text-muted-foreground border border-border px-2 py-1 rounded-md">{r.outcome}</span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground italic">None</span>
+                    )}
+                  </td>
+                  <td className="px-5 py-3 hidden lg:table-cell">
+                    {r.sentiment && <StatusBadge status={r.sentiment} />}
+                  </td>
                 </tr>
               ))}
             </tbody>
