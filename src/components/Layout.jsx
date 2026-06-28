@@ -12,7 +12,7 @@ const navItems = [
   { path: "/recordings", label: "Call Recordings", icon: Phone },
   { path: "/analytics", label: "Call Analytics", icon: BarChart3 },
   { path: "/summaries", label: "AI Summaries", icon: Brain },
-  { path: "/agents", label: "Agents", icon: Bot },
+  // { path: "/agents", label: "Agents", icon: Bot },
   { path: "/team", label: "Team Access", icon: Users },
   { path: "/settings", label: "Account Settings", icon: Settings },
 
