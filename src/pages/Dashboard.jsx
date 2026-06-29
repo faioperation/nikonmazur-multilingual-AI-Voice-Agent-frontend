@@ -69,15 +69,15 @@ export default function Dashboard() {
       </div>
 
       {/* Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4">
         <MetricCard title="Calls Today" value={cards.calls_today || 0} icon={Phone} />
         <MetricCard title="Calls This Week" value={cards.calls_this_week || 0} icon={Phone} />
         <MetricCard title="Minutes Today" value={cards.minutes_today || 0} icon={Clock} />
         <MetricCard title="Minutes This Week" value={cards.minutes_this_week || 0} icon={Clock} />
         <MetricCard title="Avg Duration" value={cards.average_duration || "0s"} icon={Clock} />
         <MetricCard title="Test Drives" value={cards.test_drive_count || 0} icon={Car} />
-        <MetricCard title="Conversion Rate" value="0%" icon={Target} />
-        <MetricCard title="Success Rate" value="0%" icon={CheckCircle} />
+        {/* <MetricCard title="Conversion Rate" value="0%" icon={Target} /> */}
+        {/* <MetricCard title="Success Rate" value="0%" icon={CheckCircle} /> */}
       </div>
 
       {/* Charts */}

@@ -39,12 +39,25 @@ export default function AISummaries() {
     return outcomes?.find(o => o.name === name)?.count || 0;
   };
 
+  const formatTextWithUserName = (text, name) => {
+    if (!text || !name) return text;
+    return text.replace(/the user/ig, name);
+  };
+
   const topOpps = data?.top_opportunities?.length > 0 
-    ? data.top_opportunities.map(o => `${o.caller_name || "Unknown"} — ${o.outcome}: ${o.highlight}`)
+    ? data.top_opportunities.map(o => {
+        const name = o.caller_name || "Unknown";
+        const formattedHighlight = formatTextWithUserName(o.highlight, o.caller_name);
+        return `${name} — ${o.outcome}: ${formattedHighlight}`;
+      })
     : ["No top opportunities found yet."];
 
   const needsAttention = data?.calls_needing_attention?.length > 0
-    ? data.calls_needing_attention.map(c => `${c.caller_name || "Unknown"} — ${c.issue || "Needs attention"}`)
+    ? data.calls_needing_attention.map(c => {
+        const name = c.caller_name || "Unknown";
+        const formattedIssue = formatTextWithUserName(c.issue, c.caller_name) || "Needs attention";
+        return `${name} — ${formattedIssue}`;
+      })
     : ["No calls require immediate attention."];
 
   const agent = data?.best_performing_agent;

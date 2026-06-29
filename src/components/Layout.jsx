@@ -21,7 +21,14 @@ const navItems = [
 export default function Layout() {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
+
+  const filteredNavItems = navItems.filter(item => {
+    if (item.path === '/team' && user?.role?.toLowerCase() === 'viewer') {
+      return false;
+    }
+    return true;
+  });
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -40,7 +47,7 @@ export default function Layout() {
           </div>
         </div>
         <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-          {navItems.map(item => {
+          {filteredNavItems.map(item => {
             const active = location.pathname === item.path;
             return (
               <Link key={item.path} to={item.path} onClick={() => setSidebarOpen(false)}
@@ -69,16 +76,16 @@ export default function Layout() {
             <span className="text-sm font-semibold hidden sm:block">{company.name}</span>
           </div>
           <div className="flex items-center gap-2">
-            <img src={LOGO_URL} alt="Gloura" className="hidden md:block h-7 object-contain opacity-80" />
-            <div className="hidden md:flex items-center gap-2 bg-secondary rounded-lg px-3 py-1.5">
+            {/* <img src={LOGO_URL} alt="Gloura" className="hidden md:block h-7 object-contain opacity-80" /> */}
+            {/* <div className="hidden md:flex items-center gap-2 bg-secondary rounded-lg px-3 py-1.5">
               <Search className="w-3.5 h-3.5 text-muted-foreground" />
               <input placeholder="Search calls, summaries…" className="bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none w-48" />
-            </div>
-            <button className="relative p-2 rounded-lg hover:bg-secondary transition-colors">
+            </div> */}
+            {/* <button className="relative p-2 rounded-lg hover:bg-secondary transition-colors">
               <Bell className="w-4 h-4 text-muted-foreground" />
               <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-primary rounded-full" />
-            </button>
-            <div className="flex items-center gap-2 pl-2 border-l border-border">
+            </button> */}
+            <div className="flex items-center gap-2 pl-2">
               <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-[10px] font-bold text-white">JS</div>
               <ChevronDown className="w-3 h-3 text-muted-foreground" />
             </div>
